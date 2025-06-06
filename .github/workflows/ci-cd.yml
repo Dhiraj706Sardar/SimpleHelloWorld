@@ -32,21 +32,10 @@ jobs:
     - name: Run tests
       run: mvn test
       
-    - name: Run SonarQube Analysis
-      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-      uses: sonarsource/sonarqube-scan@v1.0
-      with:
-        args: >
-          -Dsonar.projectKey=devops-spring-app
-          -Dsonar.projectName=devops-spring-app
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        
   docker-build:
     needs: build-and-test
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     
     steps:
     - uses: actions/checkout@v3
@@ -54,45 +43,27 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
       
-    - name: Log in to Docker Hub
+    - name: Login to Docker Hub
       uses: docker/login-action@v2
       with:
         username: ${{ secrets.DOCKER_HUB_USERNAME }}
         password: ${{ secrets.DOCKER_HUB_TOKEN }}
-        
-    - name: Extract metadata (tags, labels) for Docker
-      id: meta
-      uses: docker/metadata-action@v4
-      with:
-        images: ${{ secrets.DOCKER_HUB_USERNAME }}/devops-spring-app
         
     - name: Build and push Docker image
       uses: docker/build-push-action@v4
       with:
         context: .
         push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
+        tags: dhiraj143/helloworld:latest
         cache-from: type=gha
         cache-to: type=gha,mode=max
-        
-  deploy-to-k8s:
-    needs: docker-build
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-    runs-on: ubuntu-latest
-    
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Install kubectl
-      uses: azure/setup-kubectl@v3
-      
-    - name: Deploy to Kubernetes
-      run: |
-        # This is a placeholder. In a real scenario, you would:
-        # 1. Set up kubeconfig
-        # 2. Apply Kubernetes manifests
-        echo "Deployment to Kubernetes would happen here"
-        # Example:
-        # kubectl apply -f k8s/deployment.yaml
-        # kubectl apply -f k8s/service.yaml
+
+  # Kubernetes deployment (placeholder - uncomment and configure when ready)
+  # deploy-to-k8s:
+  #   needs: docker-build
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Deploy to Kubernetes
+  #       run: |
+  #         echo "Kubernetes deployment would happen here"
+  #         # Add your kubectl commands here
