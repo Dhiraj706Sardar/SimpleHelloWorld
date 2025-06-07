@@ -1,0 +1,99 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: datadog-config
+  namespace: default
+  labels:
+    app: datadog
+    datadog-agent: "true"
+data:
+  datadog.yaml: |
+    api_key: ${DD_API_KEY}
+    site: us5.datadoghq.com
+    logs_enabled: true
+    process_config:
+      enabled: true
+      process_discovery:
+        enabled: true
+        collection_interval: 15
+        exclude_processes:
+          - "^/usr/bin/kubelet$"
+          - "^/usr/bin/containerd$"
+          - "^/usr/bin/docker$"
+    apm_config:
+      enabled: true
+      apm_non_local_traffic: true
+      max_traces_per_second: 1000
+      max_events_per_second: 10000
+      max_services: 1000
+      max_resources: 1000
+      max_spans: 10000
+      max_events: 10000
+      max_events_per_minute: 10000
+      max_events_per_second_per_service: 10000
+
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: datadog-agent
+  namespace: default
+  labels:
+    app: datadog
+spec:
+  selector:
+    matchLabels:
+      app: datadog
+  template:
+    metadata:
+      labels:
+        app: datadog
+    spec:
+      containers:
+      - name: datadog-agent
+        image: datadog/agent:7
+        env:
+        - name: DD_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: datadog-secret
+              key: api-key
+        - name: DD_SITE
+          value: "us5.datadoghq.com"
+        - name: DD_KUBERNETES_KUBELET_TLS_VERIFY
+          value: "false"
+        - name: DD_KUBERNETES_KUBELET_SKIP_TLS_VERIFY
+          value: "true"
+        ports:
+        - containerPort: 8126
+          name: trace-agent
+          protocol: TCP
+        - containerPort: 8125
+          name: dogstatsd
+          protocol: UDP
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/datadog-agent/datadog.yaml
+          subPath: datadog.yaml
+        - name: host-proc
+          mountPath: /host/proc
+          readOnly: true
+        - name: host-cgroups
+          mountPath: /host/sys/fs/cgroup
+          readOnly: true
+        - name: host-root
+          mountPath: /host
+          readOnly: true
+      volumes:
+      - name: config-volume
+        configMap:
+          name: datadog-config
+      - name: host-proc
+        hostPath:
+          path: /proc
+      - name: host-cgroups
+        hostPath:
+          path: /sys/fs/cgroup
+      - name: host-root
+        hostPath:
+          path: /

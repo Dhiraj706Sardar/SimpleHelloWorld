@@ -1,6 +1,6 @@
 # Spring Boot DevOps Demo
 
-A simple Spring Boot application demonstrating CI/CD with GitHub Actions and Docker.
+A simple Spring Boot application demonstrating CI/CD with GitHub Actions, Docker, and Kubernetes.
 
 ## Features
 
@@ -9,6 +9,8 @@ A simple Spring Boot application demonstrating CI/CD with GitHub Actions and Doc
 - Docker containerization
 - GitHub Actions CI/CD pipeline
 - Maven build system
+- Kubernetes deployment
+- Datadog monitoring
 
 ## Prerequisites
 
@@ -16,6 +18,9 @@ A simple Spring Boot application demonstrating CI/CD with GitHub Actions and Doc
 - Maven 3.6.3 or later
 - Docker (for local development)
 - Git
+- Kubernetes cluster
+- Datadog API key
+- Bugsnag API key
 
 ## Local Development
 
@@ -49,6 +54,89 @@ docker build -t dhiraj143/helloworld .
 ### Run Docker Container
 
 ```bash
+
+## Kubernetes Deployment
+
+### Prerequisites
+
+1. Kubernetes cluster
+2. Docker Hub credentials
+3. Datadog API key
+4. Bugsnag API key
+
+### Deployment Steps
+
+1. Create Kubernetes secrets for API keys:
+```bash
+kubectl create secret generic datadog-secrets \
+  --from-literal=api-key=<your-datadog-api-key>
+
+kubectl create secret generic bugsnag-secrets \
+  --from-literal=api-key=<your-bugsnag-api-key>
+```
+
+2. Deploy the application:
+```bash
+kubectl apply -f kubernetes/deployment.yaml
+```
+
+3. Deploy monitoring:
+```bash
+kubectl apply -f kubernetes/monitoring.yaml
+```
+
+## Monitoring Setup
+
+### Datadog Dashboard
+1. Create a new dashboard in Datadog
+2. Add the following metrics:
+   - `app.devops-spring-app.response_time`
+   - `app.devops-spring-app.request_count`
+   - `app.devops-spring-app.error_count`
+   - `jvm.memory.used`
+   - `jvm.cpu.time`
+
+### Bugsnag Setup
+1. Create a new project in Bugsnag
+2. Configure error notifications
+3. Set up release tracking
+
+## Health Checks
+
+The application has two types of health checks:
+
+1. Liveness Probe:
+   - Path: `/actuator/health/liveness`
+   - Initial delay: 30 seconds
+   - Period: 10 seconds
+   - Timeout: 5 seconds
+   - Failure threshold: 3
+
+2. Readiness Probe:
+   - Path: `/actuator/health/readiness`
+   - Initial delay: 30 seconds
+   - Period: 10 seconds
+   - Timeout: 5 seconds
+   - Failure threshold: 3
+
+## CI/CD Pipeline
+
+GitHub Actions are configured to:
+1. Build and test the application
+2. Build and push Docker image
+3. Deploy to Kubernetes
+4. Run performance tests
+
+## Monitoring and Logging
+
+The application is monitored using:
+- Datadog for metrics and logs
+- Bugsnag for error tracking
+- Kubernetes health checks
+
+## Support
+
+For any issues or questions, please open an issue in the GitHub repository.
 docker run -p 8080:8080 dhiraj143/helloworld
 ```
 
