@@ -1,0 +1,54 @@
+version: 2.1
+
+orbs:
+  docker: circleci/docker@2.5.0
+  kubernetes: circleci/kubernetes@1.3
+
+jobs:
+  build-and-test:
+    docker:
+      - image: cimg/openjdk:17.0
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - maven-cache-{{ checksum "pom.xml" }}
+      - run:
+          name: Setup Maven
+          command: |
+            curl -sSL https://downloads.apache.org/maven/maven-3/3.9.5/binaries/apache-maven-3.9.5-bin.tar.gz | tar xz
+            export PATH=$PATH:$(pwd)/apache-maven-3.9.5/bin
+      - run:
+          name: Build and Test
+          command: |
+            mvn clean package
+      - save_cache:
+          key: maven-cache-{{ checksum "pom.xml" }}
+          paths:
+            - ~/.m2
+
+  deploy:
+    docker:
+      - image: cimg/base:stable
+    steps:
+      - checkout
+      - kubernetes/install-kubectl
+      - run:
+          name: Deploy to Kubernetes
+          command: |
+            echo "$KUBE_CONFIG" | base64 --decode > kubeconfig.yaml
+            export KUBECONFIG=kubeconfig.yaml
+            kubectl apply -f kubernetes/monitoring.yaml
+            kubectl apply -f kubernetes/deployment.yaml
+
+workflows:
+  version: 2
+  build-deploy:
+    jobs:
+      - build-and-test
+      - deploy:
+          requires:
+            - build-and-test
+          filters:
+            branches:
+              only: main 

@@ -39,6 +39,11 @@
                 <enabled>false</enabled>
             </releases>
         </repository>
+        <repository>
+            <id>bugsnag</id>
+            <name>Bugsnag Repository</name>
+            <url>https://repo.bugsnag.com/maven</url>
+        </repository>
     </repositories>
 
     <dependencies>
@@ -58,6 +63,11 @@
             <groupId>com.datadoghq</groupId>
             <artifactId>dd-java-agent</artifactId>
             <version>1.17.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.bugsnag</groupId>
+            <artifactId>bugsnag-spring</artifactId>
+            <version>3.7.1</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>

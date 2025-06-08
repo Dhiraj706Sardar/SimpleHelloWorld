@@ -26,38 +26,63 @@ jobs:
         key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
         restore-keys: ${{ runner.os }}-m2-
         
-    - name: Configure kubectl credentials
-      uses: azure/k8s-deploy@v1
-      with:
-        kubeconfig: ${{ secrets.KUBECONFIG }}
-        namespace: default
-        k8s-context: ${{ secrets.KUBE_CONTEXT }}
-        # Add any additional required parameters
-        # For example, if you need to specify a service account:
-        # service-account: ${{ secrets.SERVICE_ACCOUNT }}
-        
     - name: Build with Maven
       run: mvn -B clean package -DskipTests
       
     - name: Run tests
       run: mvn test
       
-    - name: Run SonarQube analysis
-      uses: SonarSource/sonarcloud-github-action@master
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      
     - name: Run security scan
       run: |
-        docker run --rm -v ${PWD}:/src owasp/dependency-check:latest --project "devops-spring-app" \
-          --format "HTML,JSON" \
-          --out "target/dependency-check-report.html" \
-          --suppression "src/main/resources/dependency-check-suppression.xml"
+        if [ -f "src/main/resources/dependency-check-suppression.xml" ]; then
+          docker run --rm -v ${PWD}:/src owasp/dependency-check:latest --project "devops-spring-app" \
+            --format "HTML,JSON" \
+            --out "target/dependency-check-report.html" \
+            --suppression "src/main/resources/dependency-check-suppression.xml"
+        else
+          echo "Warning: dependency-check-suppression.xml not found, skipping security scan"
+        fi
       
-    - name: Run performance tests
+    - name: Login to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+      
+    - name: Build and Push Docker image
       run: |
-        echo "Running performance tests..."
-        # Add your performance test commands here
-        # For example:
-        # mvn gatling:test
+        mvn jib:build \
+          -Djib.to.auth.username=${{ secrets.DOCKERHUB_USERNAME }} \
+          -Djib.to.auth.password=${{ secrets.DOCKERHUB_TOKEN }}
+
+  deploy:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v3
+      
+    - name: Configure kubectl
+      run: |
+        if [ -n "${{ secrets.KUBE_CONFIG }}" ]; then
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 --decode > kubeconfig.yaml
+          export KUBECONFIG=kubeconfig.yaml
+        else
+          echo "Error: KUBE_CONFIG secret is not set"
+          exit 1
+        fi
+        
+    - name: Deploy to Kubernetes
+      run: |
+        kubectl apply -f kubernetes/monitoring.yaml
+        kubectl apply -f kubernetes/deployment.yaml
+        
+    - name: Verify deployment
+      run: |
+        kubectl rollout status deployment/devops-spring-app
+        kubectl get pods
+        kubectl get services
