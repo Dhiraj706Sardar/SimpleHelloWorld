@@ -16,12 +16,30 @@
     <name>devops-spring-app</name>
     <description>Demo project for Spring Boot with CI/CD</description>
 
-    
     <properties>
         <java.version>17</java.version>
         <docker.image.prefix>devops-spring-app</docker.image.prefix>
         <docker.image.name>${docker.image.prefix}:${project.version}</docker.image.name>
     </properties>
+
+    <repositories>
+        <repository>
+            <id>spring-milestones</id>
+            <name>Spring Milestones</name>
+            <url>https://repo.spring.io/milestone</url>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
+        <repository>
+            <id>spring-snapshots</id>
+            <name>Spring Snapshots</name>
+            <url>https://repo.spring.io/snapshot</url>
+            <releases>
+                <enabled>false</enabled>
+            </releases>
+        </repository>
+    </repositories>
 
     <dependencies>
         <dependency>
@@ -40,11 +58,6 @@
             <groupId>com.datadoghq</groupId>
             <artifactId>dd-java-agent</artifactId>
             <version>1.17.0</version>
-        </dependency>
-        <dependency>
-            <groupId>com.bugsnag</groupId>
-            <artifactId>bugsnag-spring-boot-starter</artifactId>
-            <version>6.13.0</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
