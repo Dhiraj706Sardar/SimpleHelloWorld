@@ -15,7 +15,7 @@ public class DevopsAppApplication {
 
     @GetMapping("/")
     public String home() {
-        return "Welcome to Hello World Spring Boot Application!";
+        return "index";
     }
 
     @GetMapping("/health")
