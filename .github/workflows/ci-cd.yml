@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ main, master ]
 
+env:
+  DOCKER_IMAGE: dhiraj143/helloworld
+  DOCKER_TAG: ${{ github.sha }}
+  DOCKER_IMAGE_LATEST: dhiraj143/helloworld:latest
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -19,71 +24,81 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Verify Java version
+        run: java -version
 
       - name: Cache Maven packages
         uses: actions/cache@v3
         with:
-          path: ~/.m2
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-m2-
+          path: |
+            ~/.m2
+            ~/.maven-wrapper
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-maven-
 
-      - name: Build and run tests
-        run: mvn clean verify
-
-      - name: Run security scan
+      - name: Build with Maven Wrapper
         run: |
-          echo "Working directory: $(pwd)"
-          ls -la
-          if [ -f "src/main/resources/dependency-check-suppression.xml" ]; then
-            docker run --rm -v $(pwd):/src owasp/dependency-check:latest --project "devops-spring-app" \
-              --format "HTML,JSON" \
-              --out "target/dependency-check-report.html" \
-              --suppression "src/main/resources/dependency-check-suppression.xml"
-          else
-            echo "Warning: dependency-check-suppression.xml not found, skipping security scan"
-          fi
+          ./mvnw --version
+          ./mvnw clean package -DskipTests
 
+      - name: Run unit tests
+        run: ./mvnw test
+
+      - name: Run integration tests
+        if: success()
+        run: ./mvnw verify -Pintegration-tests
+
+  build-and-push:
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+          
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }}
+            ${{ env.DOCKER_IMAGE_LATEST }}
 
-      - name: Build and push Docker image with Jib
+      - name: Run security scan
+        if: always()
         run: |
-          mvn jib:build \
-            -Djib.to.auth.username=${{ secrets.DOCKERHUB_USERNAME }} \
-            -Djib.to.auth.password=${{ secrets.DOCKERHUB_TOKEN }}
-
-  deploy:
-    needs: build-and-test
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Set up kubectl
-        uses: azure/setup-kubectl@v3
-
-      - name: Configure kubectl
-        run: |
-          if [ -n "${{ secrets.KUBE_CONFIG }}" ]; then
-            echo "${{ secrets.KUBE_CONFIG }}" | base64 --decode > kubeconfig.yaml
-            export KUBECONFIG=kubeconfig.yaml
+          echo "Working directory: $(pwd)"
+          if [ -f "src/main/resources/dependency-check-suppression.xml" ]; then
+            docker run --rm -v $(pwd):/src owasp/dependency-check:latest --project "devops-spring-app" \
+              --format "HTML,JSON" \
+              --out "target/dependency-check-report.html" \
+              --suppression "src/main/resources/dependency-check-suppression.xml"
+            
+            # Upload report as artifact
+            echo "Uploading security scan report..."
+            echo "##[set-output name=report-path;]target/dependency-check-report.html"
           else
-            echo "Error: KUBE_CONFIG secret is not set"
-            exit 1
+            echo "Warning: dependency-check-suppression.xml not found, skipping security scan"
           fi
 
-      - name: Deploy to Kubernetes
-        run: |
-          kubectl apply -f kubernetes/monitoring.yaml
-          kubectl apply -f kubernetes/deployment.yaml
-
-      - name: Verify deployment
-        run: |
-          kubectl rollout status deployment/devops-spring-app
-          kubectl get pods
-          kubectl get services
+      - name: Upload security report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-report
+          path: target/dependency-check-report.html
+          if-no-files-found: ignore
+          retention-days: 5
