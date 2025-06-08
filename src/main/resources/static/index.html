@@ -55,6 +55,16 @@
             border-radius: 5px;
             color: #2e7d32;
         }
+        .version {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: #2c3e50;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 0.8rem;
+        }
     </style>
 </head>
 <body>
@@ -80,7 +90,12 @@
         <div class="status">
             <p>Application Status: Running</p>
             <p>Environment: Production</p>
+            <p>Last Deployed: <span id="deployTime"></span></p>
         </div>
     </div>
+    <div class="version">Version: 1.0.1</div>
+    <script>
+        document.getElementById('deployTime').textContent = new Date().toLocaleString();
+    </script>
 </body>
 </html> 
